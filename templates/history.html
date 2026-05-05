@@ -1,0 +1,12 @@
+<h1>История</h1>
+
+<img src="{{ graph }}">
+
+<table border="1">
+{% for r in rows %}
+<tr>
+<td>{{ r[0] }}</td>
+<td>{{ r[1] }}</td>
+</tr>
+{% endfor %}
+</table>

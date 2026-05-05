@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Network Monitor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-dark text-light">
+
+<div class="container mt-4">
+
+<h1>🌐 Network Monitor</h1>
+
+<button onclick="startScan()" class="btn btn-primary mb-3">
+    🔍 Полное сканирование
+</button>
+
+<div class="progress mb-3">
+    <div id="bar" class="progress-bar">0%</div>
+</div>
+
+<table class="table table-dark table-bordered">
+<tr>
+<th>Name</th><th>IP</th><th>Status</th><th>RT</th>
+</tr>
+
+{% for d, last in data %}
+<tr>
+<td>{{ d[1] }}</td>
+<td>{{ d[2] }}</td>
+<td>{% if last and last[0] %}🟢{% else %}🔴{% endif %}</td>
+<td>{{ last[1] if last else "-" }}</td>
+</tr>
+{% endfor %}
+</table>
+
+</div>
+
+<script>
+function startScan() {
+    fetch("/scan");
+    update();
+}
+
+function update() {
+    fetch("/scan_status")
+    .then(r => r.json())
+    .then(d => {
+        let p = Math.floor((d.progress/d.total)*100);
+        let bar = document.getElementById("bar");
+        bar.style.width = p+"%";
+        bar.innerText = p+"%";
+
+        if (d.running) setTimeout(update, 1000);
+        else location.reload();
+    });
+}
+</script>
+
+</body>
+</html>

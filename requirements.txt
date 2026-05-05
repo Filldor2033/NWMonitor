@@ -1,0 +1,6 @@
+flask
+flask-login
+apscheduler
+matplotlib
+requests
+flask-bootstrap
