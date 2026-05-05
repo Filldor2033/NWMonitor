@@ -8,7 +8,6 @@ def get_conn():
         DB,
         timeout=30,
         check_same_thread=False,
-        isolation_level=None  # 🔥 autocommit
     )
 
 
@@ -46,4 +45,14 @@ def init_db():
             message TEXT,
             timestamp TEXT
         )
+        """)
+
+        c.execute("""
+        CREATE INDEX IF NOT EXISTS idx_checks_device_id_id
+        ON checks(device_id, id DESC)
+        """)
+
+        c.execute("""
+        CREATE INDEX IF NOT EXISTS idx_checks_device_id_timestamp
+        ON checks(device_id, timestamp)
         """)
