@@ -1,5 +1,4 @@
 import traceback
-from flask import Flask, render_template, redirect, jsonify, send_file
 import threading
 import csv
 import matplotlib.pyplot as plt
@@ -8,6 +7,7 @@ from database import init_db, get_conn
 from scanner import scan_full_network
 from monitor import run_checks
 from apscheduler.schedulers.background import BackgroundScheduler
+from flask import Flask, render_template, redirect, jsonify, send_file
 
 app = Flask(__name__)
 init_db()
