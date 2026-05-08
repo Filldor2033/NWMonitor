@@ -349,7 +349,6 @@
                 </div>
                 <div class="controls">
                     <button onclick="startPingRefresh()" class="btn btn-ghost">Обновить пинг</button>
-                    <button onclick="startScan()" class="btn btn-primary">Сканировать сеть</button>
                     <form method="post" action="/admin_mode" style="display:inline-flex;">
                         <input type="hidden" name="room" value="{{ selected_room }}">
                         <input type="hidden" name="enabled" value="{% if admin_mode %}0{% else %}1{% endif %}">
@@ -536,31 +535,6 @@
         bar.style.width = p + "%";
         bar.innerText = p + "%";
         label.innerText = labelText + " (" + progress + "/" + safeTotal + ")";
-    }
-
-    function startScan() {
-        fetch("/scan")
-            .then(r => {
-                if (!r.ok) {
-                    return r.json().then(d => Promise.reject(d.error || "Ошибка запуска сканирования"));
-                }
-                updateScan();
-            })
-            .catch(e => alert(e));
-    }
-
-    function updateScan() {
-        fetch("/scan_status")
-            .then(r => r.json())
-            .then(d => {
-                setProgress(d.progress || 0, d.total || 1, "Полное сканирование сети");
-
-                if (d.running) {
-                    setTimeout(updateScan, 1000);
-                } else {
-                    location.reload();
-                }
-            });
     }
 
     function startPingRefresh() {
