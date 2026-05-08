@@ -1,63 +1,63 @@
-import subprocess
-import platform
-import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import asyncio
+import concurrent.futures
+import ping3
+
 from database import get_conn
 
+MAX_CHECK_CONCURRENCY = 256
+PING_TIMEOUT_SEC = 1
 
-MAX_CHECK_THREADS = 32
+EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CHECK_CONCURRENCY)
 
 
-def ping(ip):
-    system = platform.system().lower()
-
+async def ping_async(ip):
+    loop = asyncio.get_running_loop()
     try:
-        if system == "windows":
-            cmd = ["ping", "-n", "1", "-w", "500", ip]
-        else:
-            cmd = ["ping", "-c", "1", "-W", "1", ip]
-
-        start = time.time()
-
-        result = subprocess.run(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=2
+        delay_sec = await loop.run_in_executor(
+            EXECUTOR,  # используем наш пул
+            lambda: ping3.ping(ip, timeout=PING_TIMEOUT_SEC),
         )
-
-        end = time.time()
-
-        if result.returncode == 0:
-            return True, (end - start) * 1000
-
-        return False, None
-
+        if delay_sec is None:
+            return False, None
+        return True, delay_sec * 1000
     except Exception:
         return False, None
 
 
-def check_device(d):
-    device_id, name, ip, device_type = d
-    alive, rt = ping(ip)
+async def check_device_async(d):
+    device_id, _name, ip, _device_type = d[:4]
+    if not ip:
+        return device_id, False, None
+
+    alive, rt = await ping_async(ip)
     return device_id, alive, rt
 
 
-def run_checks():
+async def run_checks_async(progress_callback=None):
     with get_conn() as conn:
         c = conn.cursor()
-        devices = c.execute("SELECT * FROM devices").fetchall()
+        devices = c.execute("SELECT id, name, ip, type FROM devices").fetchall()
 
     if not devices:
         return
 
+    sem = asyncio.Semaphore(MAX_CHECK_CONCURRENCY)
+
+    async def guarded_check(device):
+        async with sem:
+            return await check_device_async(device)
+
+    tasks = [asyncio.create_task(guarded_check(d)) for d in devices]
+
     results = []
+    total = len(tasks)
+    done = 0
 
-    with ThreadPoolExecutor(max_workers=MAX_CHECK_THREADS) as executor:
-        futures = [executor.submit(check_device, d) for d in devices]
-
-        for f in as_completed(futures):
-            results.append(f.result())
+    for finished in asyncio.as_completed(tasks):
+        results.append(await finished)
+        done += 1
+        if progress_callback:
+            progress_callback(done, total)
 
     check_rows = []
     alert_rows = []
@@ -74,17 +74,27 @@ def run_checks():
         try:
             conn.execute("BEGIN IMMEDIATE")
 
-            conn.executemany("""
-            INSERT INTO checks (device_id, status, response_time, timestamp)
-            VALUES (?, ?, ?, datetime('now'))
-            """, check_rows)
+            conn.executemany(
+                """
+                INSERT INTO checks (device_id, status, response_time, timestamp)
+                VALUES (?, ?, ?, datetime('now'))
+                """,
+                check_rows,
+            )
 
-            conn.executemany("""
-            INSERT INTO alerts (device_id, message, timestamp)
-            VALUES (?, ?, datetime('now'))
-            """, alert_rows)
+            conn.executemany(
+                """
+                INSERT INTO alerts (device_id, message, timestamp)
+                VALUES (?, ?, datetime('now'))
+                """,
+                alert_rows,
+            )
 
             conn.commit()
         except Exception:
             conn.rollback()
             raise
+
+
+def run_checks(progress_callback=None):
+    asyncio.run(run_checks_async(progress_callback=progress_callback))

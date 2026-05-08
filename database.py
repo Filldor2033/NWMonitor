@@ -28,6 +28,26 @@ def init_db():
         )
         """)
 
+        # Lightweight migration support for old databases.
+        existing_columns = {
+            row[1] for row in c.execute("PRAGMA table_info(devices)").fetchall()
+        }
+
+        optional_columns = {
+            "room": "TEXT",
+            "row_no": "INTEGER",
+            "desk_no": "INTEGER",
+            "pc_no": "INTEGER",
+            "last_heartbeat": "TEXT",
+            "client_version": "TEXT",
+            "client_control_port": "INTEGER",
+            "client_control_token": "TEXT",
+        }
+
+        for column_name, column_type in optional_columns.items():
+            if column_name not in existing_columns:
+                c.execute(f"ALTER TABLE devices ADD COLUMN {column_name} {column_type}")
+
         c.execute("""
         CREATE TABLE IF NOT EXISTS checks (
             id INTEGER PRIMARY KEY,
@@ -55,4 +75,9 @@ def init_db():
         c.execute("""
         CREATE INDEX IF NOT EXISTS idx_checks_device_id_timestamp
         ON checks(device_id, timestamp)
+        """)
+
+        c.execute("""
+        CREATE INDEX IF NOT EXISTS idx_devices_room_place
+        ON devices(room, row_no, desk_no, pc_no)
         """)
