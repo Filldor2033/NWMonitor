@@ -397,18 +397,22 @@
                             {% for place in desk.pcs %}
                                 {% set d = place.device %}
                                 {% if d %}
-                                    {% if d.is_up is sameas true %}
+                                    {% if d.combined_status == 'heartbeat' %}
                                         {% set state = 'state-up' %}
                                         {% set badge = 'badge-up' %}
                                         {% set status_label = 'Онлайн' %}
-                                    {% elif d.is_up is sameas false %}
+                                    {% elif d.combined_status == 'ping' %}
+                                        {% set state = 'state-up' %}
+                                        {% set badge = 'badge-up' %}
+                                        {% set status_label = 'Онлайн (пинг)' %}
+                                    {% elif d.combined_status == 'offline' %}
                                         {% set state = 'state-down' %}
                                         {% set badge = 'badge-down' %}
                                         {% set status_label = 'Офлайн' %}
                                     {% else %}
                                         {% set state = 'state-unknown' %}
                                         {% set badge = 'badge-unknown' %}
-                                        {% set status_label = 'Нет пинга' %}
+                                        {% set status_label = 'Нет данных' %}
                                     {% endif %}
                                 {% else %}
                                     {% set state = 'state-empty' %}
@@ -416,7 +420,7 @@
                                     {% set status_label = 'Пусто' %}
                                 {% endif %}
 
-                                <div class="pc-slot {{ state }}">
+                                <div class="pc-slot {{ state }}" data-device-id="{{ d.id if d else '' }}" data-pc="{{ place.pc_no }}" data-row="{{ place.row_no }}" data-desk="{{ place.desk_no }}">
                                     <div class="pc-head">
                                         <strong>ПК {{ place.pc_no }} {% if place.pc_no == 1 %}(слева){% else %}(справа){% endif %}</strong>
                                         <span class="badge {{ badge }}">{{ status_label }}</span>
@@ -473,12 +477,14 @@
                             <td>{{ d.name }}</td>
                             <td class="mono">{{ d.ip }}</td>
                             <td>
-                                {% if d.is_up is sameas true %}
-                                <span class="status-pill badge-up">Онлайн</span>
-                                {% elif d.is_up is sameas false %}
-                                <span class="status-pill badge-down">Офлайн</span>
+                                {% if d.combined_status == 'heartbeat' %}
+                                <span class="status-pill badge-up" data-device-id="{{ d.id }}">Онлайн</span>
+                                {% elif d.combined_status == 'ping' %}
+                                <span class="status-pill badge-up" data-device-id="{{ d.id }}">Онлайн (пинг)</span>
+                                {% elif d.combined_status == 'offline' %}
+                                <span class="status-pill badge-down" data-device-id="{{ d.id }}">Офлайн</span>
                                 {% else %}
-                                <span class="status-pill badge-unknown">Нет данных</span>
+                                <span class="status-pill badge-unknown" data-device-id="{{ d.id }}">Нет данных</span>
                                 {% endif %}
                             </td>
                             <td>{{ "%.1f"|format(d.response_time) if d.response_time is not none else "-" }}</td>
@@ -527,7 +533,57 @@
     </main>
 
     <script>
-    function setProgress(progress, total, labelText) {
+    // --- Status labels/classes map ---
+    const STATUS = {
+        heartbeat: { state: 'state-up',      badge: 'badge-up',      label: 'Онлайн' },
+        ping:      { state: 'state-up',      badge: 'badge-up',      label: 'Онлайн (пинг)' },
+        offline:   { state: 'state-down',    badge: 'badge-down',    label: 'Офлайн' },
+        unknown:   { state: 'state-unknown', badge: 'badge-unknown', label: 'Нет данных' },
+    };
+    const STATE_CLASSES = ['state-up', 'state-down', 'state-unknown', 'state-empty'];
+
+    function applyStatuses(data) {
+        // Update classroom grid slots
+        document.querySelectorAll('.pc-slot[data-device-id]').forEach(slot => {
+            const id = slot.dataset.deviceId;
+            if (!id) return;
+            const s = data[id] || 'unknown';
+            const cfg = STATUS[s] || STATUS.unknown;
+
+            // swap state class
+            STATE_CLASSES.forEach(c => slot.classList.remove(c));
+            slot.classList.add(cfg.state);
+
+            // swap badge text + class
+            const badge = slot.querySelector('.badge');
+            if (badge) {
+                badge.className = 'badge ' + cfg.badge;
+                badge.textContent = cfg.label;
+            }
+        });
+
+        // Update devices table pills
+        document.querySelectorAll('.status-pill[data-device-id]').forEach(pill => {
+            const id = pill.dataset.deviceId;
+            const s = data[id] || 'unknown';
+            const cfg = STATUS[s] || STATUS.unknown;
+            pill.className = 'status-pill ' + cfg.badge;
+            pill.textContent = cfg.label;
+        });
+    }
+
+    function pollStatuses() {
+        fetch('/api/device_statuses')
+            .then(r => r.json())
+            .then(applyStatuses)
+            .catch(() => {})   // silent fail — stale data is fine
+            .finally(() => setTimeout(pollStatuses, 30000));
+    }
+
+    // Kick off after page load
+    document.addEventListener('DOMContentLoaded', () => setTimeout(pollStatuses, 30000));
+    </script>
+</body>
         const safeTotal = total || 1;
         const p = Math.floor((progress / safeTotal) * 100);
         const bar = document.getElementById("bar");

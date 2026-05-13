@@ -48,7 +48,7 @@ def reset_stale_heartbeats():
 
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(run_checks, "interval", seconds=60, max_instances=1, coalesce=True)
+scheduler.add_job(run_checks, "interval", seconds=30, max_instances=1, coalesce=True)
 scheduler.add_job(reset_stale_heartbeats, "interval", seconds=30, max_instances=1, coalesce=True)
 scheduler.start()
 
@@ -159,7 +159,6 @@ def index():
                 d.client_control_port, d.client_control_token,
                 c.status, c.response_time, c.timestamp,
                 d.heartbeat_online,
-                -- heartbeat is considered fresh if received within 2 minutes
                 CASE
                     WHEN d.last_heartbeat IS NOT NULL
                          AND (strftime('%s','now') - strftime('%s', d.last_heartbeat)) <= 120
@@ -418,6 +417,48 @@ def client_heartbeat():
             raise
 
     return jsonify({"ok": True, "ip": ip})
+
+
+@app.route("/api/device_statuses")
+def device_statuses():
+    """Lightweight endpoint: returns combined_status for every device."""
+    with get_conn() as conn:
+        c = conn.cursor()
+        rows = c.execute(
+            """
+            SELECT
+                d.id,
+                c.status,
+                CASE
+                    WHEN d.last_heartbeat IS NOT NULL
+                         AND (strftime('%s','now') - strftime('%s', d.last_heartbeat)) <= 120
+                    THEN 1
+                    ELSE 0
+                END AS heartbeat_fresh
+            FROM devices d
+            LEFT JOIN checks c ON c.id = (
+                SELECT id FROM checks
+                WHERE device_id = d.id
+                ORDER BY id DESC
+                LIMIT 1
+            )
+            """
+        ).fetchall()
+
+    result = {}
+    for device_id, ping_status_val, heartbeat_fresh in rows:
+        ping_up = bool(ping_status_val) if ping_status_val is not None else None
+        if heartbeat_fresh:
+            s = "heartbeat"
+        elif ping_up is True:
+            s = "ping"
+        elif ping_up is False:
+            s = "offline"
+        else:
+            s = "unknown"
+        result[str(device_id)] = s
+
+    return jsonify(result)
 
 
 @app.route("/scan_status")
