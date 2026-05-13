@@ -1,4 +1,4 @@
-import csv
+﻿import csv
 import os
 import threading
 import traceback
@@ -25,8 +25,31 @@ app.secret_key = os.environ.get("NWMONITOR_SECRET_KEY", "nwmonitor-dev-secret")
 init_db()
 
 # --- Scheduler ---
+def reset_stale_heartbeats():
+    """Mark devices as heartbeat_online=0 if last_heartbeat is older than 2 minutes."""
+    with get_conn() as conn:
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                """
+                UPDATE devices
+                SET heartbeat_online = 0
+                WHERE heartbeat_online = 1
+                  AND (
+                    last_heartbeat IS NULL
+                    OR (strftime('%s','now') - strftime('%s', last_heartbeat)) > 120
+                  )
+                """
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+
 scheduler = BackgroundScheduler()
 scheduler.add_job(run_checks, "interval", seconds=60, max_instances=1, coalesce=True)
+scheduler.add_job(reset_stale_heartbeats, "interval", seconds=30, max_instances=1, coalesce=True)
 scheduler.start()
 
 # --- Classroom constants ---
@@ -134,7 +157,15 @@ def index():
                 d.id, d.name, d.ip, d.type,
                 d.room, d.row_no, d.desk_no, d.pc_no, d.last_heartbeat,
                 d.client_control_port, d.client_control_token,
-                c.status, c.response_time, c.timestamp
+                c.status, c.response_time, c.timestamp,
+                d.heartbeat_online,
+                -- heartbeat is considered fresh if received within 2 minutes
+                CASE
+                    WHEN d.last_heartbeat IS NOT NULL
+                         AND (strftime('%s','now') - strftime('%s', d.last_heartbeat)) <= 120
+                    THEN 1
+                    ELSE 0
+                END AS heartbeat_fresh
             FROM devices d
             LEFT JOIN checks c ON c.id = (
                 SELECT id FROM checks
@@ -162,6 +193,22 @@ def index():
 
     devices = []
     for r in rows:
+        ping_up = bool(r[11]) if r[11] is not None else None
+        heartbeat_fresh = bool(r[15])
+
+        # Combined online status:
+        #   - "heartbeat" → client actively reporting (regardless of ping)
+        #   - "ping"      → reachable by ping but no recent heartbeat
+        #   - True/False  → legacy / ping-only devices
+        if heartbeat_fresh:
+            combined_status = "heartbeat"
+        elif ping_up is True:
+            combined_status = "ping"
+        elif ping_up is False:
+            combined_status = "offline"
+        else:
+            combined_status = None
+
         devices.append(
             {
                 "id": r[0],
@@ -175,9 +222,12 @@ def index():
                 "last_heartbeat": r[8],
                 "client_control_port": r[9],
                 "client_control_token": r[10],
-                "is_up": bool(r[11]) if r[11] is not None else None,
+                "is_up": ping_up,
                 "response_time": r[12],
                 "last_check_at": r[13],
+                "heartbeat_online": bool(r[14]) if r[14] is not None else False,
+                "heartbeat_fresh": heartbeat_fresh,
+                "combined_status": combined_status,
             }
         )
 
@@ -332,9 +382,10 @@ def client_heartbeat():
                 """
                 INSERT INTO devices (
                     name, ip, type, room, row_no, desk_no, pc_no,
-                    last_heartbeat, client_version, client_control_port, client_control_token
+                    last_heartbeat, client_version, client_control_port, client_control_token,
+                    heartbeat_online
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, 1)
                 ON CONFLICT(ip) DO UPDATE SET
                     name = excluded.name,
                     type = excluded.type,
@@ -345,7 +396,8 @@ def client_heartbeat():
                     last_heartbeat = datetime('now'),
                     client_version = excluded.client_version,
                     client_control_port = excluded.client_control_port,
-                    client_control_token = excluded.client_control_token
+                    client_control_token = excluded.client_control_token,
+                    heartbeat_online = 1
                 """,
                 (
                     name,

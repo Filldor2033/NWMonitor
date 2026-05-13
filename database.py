@@ -42,6 +42,8 @@ def init_db():
             "client_version": "TEXT",
             "client_control_port": "INTEGER",
             "client_control_token": "TEXT",
+            # 1 = heartbeat received recently, 0 = client gone silent
+            "heartbeat_online": "INTEGER",
         }
 
         for column_name, column_type in optional_columns.items():

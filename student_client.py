@@ -135,6 +135,7 @@ def send_heartbeat(config):
         "client_version": CLIENT_VERSION,
         "client_control_port": config.get("client_control_port"),
         "client_control_token": config.get("client_control_token"),
+        "online": True,  # explicit liveness flag carried in every heartbeat
     }
 
     response = requests.post(url, json=payload, timeout=5)
