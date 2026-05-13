@@ -330,6 +330,70 @@
             color: #991b1b;
         }
 
+        /* ---- dots menu ---- */
+        .pc-actions {
+            position: relative;
+            display: inline-block;
+            margin-top: 8px;
+        }
+
+        .dots-btn {
+            border: 0;
+            background: rgba(0,0,0,.06);
+            border-radius: 7px;
+            width: 28px;
+            height: 28px;
+            font-size: 1rem;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #475569;
+            transition: background .15s;
+        }
+
+        .dots-btn:hover { background: rgba(0,0,0,.13); }
+
+        .dots-menu {
+            display: none;
+            position: absolute;
+            left: 0;
+            top: calc(100% + 4px);
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            box-shadow: 0 8px 24px rgba(16,24,40,.10);
+            min-width: 170px;
+            z-index: 100;
+            overflow: hidden;
+        }
+
+        .dots-menu.open { display: block; }
+
+        .dots-menu button,
+        .dots-menu a {
+            display: block;
+            width: 100%;
+            text-align: left;
+            border: 0;
+            background: none;
+            padding: 9px 14px;
+            font: inherit;
+            font-size: .82rem;
+            font-weight: 600;
+            color: var(--text);
+            cursor: pointer;
+            text-decoration: none;
+            transition: background .12s;
+        }
+
+        .dots-menu button:hover,
+        .dots-menu a:hover { background: #f1f5f9; }
+
+        .dots-menu .menu-danger { color: #991b1b; }
+        .dots-menu .menu-danger:hover { background: #fef2f2; }
+
         @media (max-width: 900px) {
             .desks { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
         }
@@ -430,10 +494,16 @@
                                         <div class="pc-meta mono">{{ d.ip }}</div>
                                         <div class="pc-meta">RT: {{ "%.1f"|format(d.response_time) if d.response_time is not none else "-" }} ms</div>
                                         {% if admin_mode %}
-                                        <form method="post" action="/admin/remove_assignment/{{ d.id }}">
-                                            <input type="hidden" name="room" value="{{ selected_room }}">
-                                            <button class="remove-btn" type="submit">Удалить с места</button>
-                                        </form>
+                                        <div class="pc-actions">
+                                            <button class="dots-btn" onclick="toggleMenu(this)" title="Действия">⋯</button>
+                                            <div class="dots-menu">
+                                                <button onclick="alert('В разработке')">🖥 Управление компьютером</button>
+                                                <form method="post" action="/admin/remove_assignment/{{ d.id }}" style="margin:0">
+                                                    <input type="hidden" name="room" value="{{ selected_room }}">
+                                                    <button type="submit" class="menu-danger">✕ Удалить с места</button>
+                                                </form>
+                                            </div>
+                                        </div>
                                         {% endif %}
                                     {% else %}
                                         <div class="pc-meta">Нет назначенного компьютера</div>
@@ -533,6 +603,20 @@
     </main>
 
     <script>
+    function toggleMenu(btn) {
+        const menu = btn.nextElementSibling;
+        const isOpen = menu.classList.contains('open');
+        // close all open menus first
+        document.querySelectorAll('.dots-menu.open').forEach(m => m.classList.remove('open'));
+        if (!isOpen) menu.classList.add('open');
+    }
+
+    document.addEventListener('click', e => {
+        if (!e.target.closest('.pc-actions')) {
+            document.querySelectorAll('.dots-menu.open').forEach(m => m.classList.remove('open'));
+        }
+    });
+
     // --- Status labels/classes map ---
     const STATUS = {
         heartbeat: { state: 'state-up',      badge: 'badge-up',      label: 'Онлайн' },
@@ -582,41 +666,6 @@
 
     // Kick off after page load
     document.addEventListener('DOMContentLoaded', () => setTimeout(pollStatuses, 30000));
-    </script>
-</body>
-        const safeTotal = total || 1;
-        const p = Math.floor((progress / safeTotal) * 100);
-        const bar = document.getElementById("bar");
-        const label = document.getElementById("progress-label");
-        bar.style.width = p + "%";
-        bar.innerText = p + "%";
-        label.innerText = labelText + " (" + progress + "/" + safeTotal + ")";
-    }
-
-    function startPingRefresh() {
-        fetch("/refresh_ping")
-            .then(r => {
-                if (!r.ok) {
-                    return r.json().then(d => Promise.reject(d.error || "Ошибка запуска проверки пинга"));
-                }
-                updatePing();
-            })
-            .catch(e => alert(e));
-    }
-
-    function updatePing() {
-        fetch("/ping_status")
-            .then(r => r.json())
-            .then(d => {
-                setProgress(d.progress || 0, d.total || 1, "Обновление пинга устройств");
-
-                if (d.running) {
-                    setTimeout(updatePing, 800);
-                } else {
-                    location.reload();
-                }
-            });
-    }
     </script>
 </body>
 </html>
