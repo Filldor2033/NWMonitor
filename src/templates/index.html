@@ -1,0 +1,670 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Network Monitor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f4f6f8;
+            --surface: #ffffff;
+            --text: #111827;
+            --muted: #6b7280;
+            --line: #e5e7eb;
+            --accent: #1d4ed8;
+            --accent-soft: #dbeafe;
+            --ok: #059669;
+            --ok-bg: #d1fae5;
+            --down: #dc2626;
+            --down-bg: #fee2e2;
+            --unknown: #b45309;
+            --unknown-bg: #fef3c7;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: "Manrope", sans-serif;
+            color: var(--text);
+            background: radial-gradient(circle at top, #ffffff 0%, var(--bg) 58%);
+        }
+
+        .page {
+            max-width: 1260px;
+            margin: 32px auto 48px;
+            padding: 0 16px;
+            display: grid;
+            gap: 18px;
+        }
+
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            box-shadow: 0 8px 28px rgba(16, 24, 40, 0.05);
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 20px 22px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .title {
+            margin: 0;
+            font-size: clamp(1.3rem, 1.9vw, 1.85rem);
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 0.94rem;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .btn {
+            border: 0;
+            border-radius: 11px;
+            padding: 10px 14px;
+            font-family: inherit;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform .16s ease, opacity .16s ease;
+        }
+
+        .btn:hover { transform: translateY(-1px); }
+
+        .btn-primary {
+            color: #fff;
+            background: linear-gradient(135deg, #2563eb, #1e40af);
+            box-shadow: 0 8px 18px rgba(37, 99, 235, .25);
+        }
+
+        .btn-ghost {
+            background: var(--accent-soft);
+            color: var(--accent);
+        }
+
+        .field, select, input {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 8px 10px;
+            font: inherit;
+            color: var(--text);
+            background: #fff;
+        }
+
+        .progress-wrap {
+            padding: 0 22px 18px;
+        }
+
+        .progress {
+            width: 100%;
+            height: 12px;
+            border-radius: 999px;
+            background: #e0e7ff;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            width: 0;
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+            color: #fff;
+            font-size: .7rem;
+            line-height: 12px;
+            text-align: center;
+            font-weight: 700;
+            transition: width .3s ease;
+        }
+
+        .room-bar {
+            padding: 0 22px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .room-form {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .layout {
+            padding: 0 22px 22px;
+            display: grid;
+            gap: 16px;
+        }
+
+        .row-title {
+            margin: 0 0 10px;
+            font-size: .92rem;
+            color: #334155;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+
+        .desks {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(180px, 1fr));
+            gap: 12px;
+        }
+
+        .desk {
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: #f8fafc;
+            padding: 10px;
+        }
+
+        .desk-name {
+            font-size: .78rem;
+            color: #475569;
+            margin-bottom: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+        }
+
+        .pc-slot {
+            border-radius: 10px;
+            border: 1px solid transparent;
+            padding: 8px;
+            margin-bottom: 8px;
+            background: #fff;
+        }
+
+        .pc-slot:last-child { margin-bottom: 0; }
+
+        .state-up {
+            border-color: #86efac;
+            background: var(--ok-bg);
+        }
+
+        .state-down {
+            border-color: #fca5a5;
+            background: var(--down-bg);
+        }
+
+        .state-unknown {
+            border-color: #fcd34d;
+            background: var(--unknown-bg);
+        }
+
+        .state-empty {
+            border-color: var(--line);
+            background: #fff;
+        }
+
+        .pc-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 4px;
+            font-size: .82rem;
+        }
+
+        .badge {
+            border-radius: 999px;
+            padding: 3px 8px;
+            font-size: .72rem;
+            font-weight: 700;
+        }
+
+        .badge-up { color: var(--ok); background: #ecfdf5; }
+        .badge-down { color: var(--down); background: #fef2f2; }
+        .badge-unknown { color: var(--unknown); background: #fffbeb; }
+
+        .pc-name {
+            font-size: .82rem;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .pc-meta {
+            font-size: .76rem;
+            color: #475569;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+            padding: 0 12px 12px;
+        }
+
+        table {
+            width: 100%;
+            min-width: 1050px;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            border-bottom: 1px solid var(--line);
+            text-align: left;
+            padding: 10px;
+            vertical-align: middle;
+            font-size: .9rem;
+        }
+
+        th {
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: #334155;
+            font-size: .76rem;
+        }
+
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: .84rem;
+        }
+
+        .status-pill {
+            border-radius: 999px;
+            padding: 4px 8px;
+            font-size: .76rem;
+            font-weight: 700;
+            display: inline-block;
+        }
+
+        .assign-form {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .mini {
+            width: 62px;
+            padding: 6px 8px;
+            font-size: .82rem;
+        }
+
+        .actions a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+            margin-right: 12px;
+        }
+
+        .actions a:hover { text-decoration: underline; }
+
+        .admin-note {
+            margin: 0 22px 14px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: .85rem;
+            border: 1px solid #fcd34d;
+            background: #fffbeb;
+            color: #92400e;
+        }
+
+        .remove-btn {
+            margin-top: 8px;
+            border: 0;
+            border-radius: 8px;
+            font-size: .75rem;
+            padding: 6px 8px;
+            font-weight: 700;
+            cursor: pointer;
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* ---- dots menu ---- */
+        .pc-actions {
+            position: relative;
+            display: inline-block;
+            margin-top: 8px;
+        }
+
+        .dots-btn {
+            border: 0;
+            background: rgba(0,0,0,.06);
+            border-radius: 7px;
+            width: 28px;
+            height: 28px;
+            font-size: 1rem;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #475569;
+            transition: background .15s;
+        }
+
+        .dots-btn:hover { background: rgba(0,0,0,.13); }
+
+        .dots-menu {
+            display: none;
+            position: absolute;
+            left: 0;
+            top: calc(100% + 4px);
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            box-shadow: 0 8px 24px rgba(16,24,40,.10);
+            min-width: 170px;
+            z-index: 100;
+            overflow: hidden;
+        }
+
+        .dots-menu.open { display: block; }
+
+        .dots-menu button,
+        .dots-menu a {
+            display: block;
+            width: 100%;
+            text-align: left;
+            border: 0;
+            background: none;
+            padding: 9px 14px;
+            font: inherit;
+            font-size: .82rem;
+            font-weight: 600;
+            color: var(--text);
+            cursor: pointer;
+            text-decoration: none;
+            transition: background .12s;
+        }
+
+        .dots-menu button:hover,
+        .dots-menu a:hover { background: #f1f5f9; }
+
+        .dots-menu .menu-danger { color: #991b1b; }
+        .dots-menu .menu-danger:hover { background: #fef2f2; }
+
+        @media (max-width: 900px) {
+            .desks { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
+        }
+
+        @media (max-width: 560px) {
+            .desks { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <section class="panel">
+            <header class="header">
+                <div>
+                    <h1 class="title">Мониторинг аудитории</h1>
+                    <p class="subtitle">Схема: 2 ряда, 4 парты в ряду, 2 компьютера на каждой парте</p>
+                </div>
+                <div class="controls">
+                    <button onclick="startPingRefresh()" class="btn btn-ghost">Обновить пинг</button>
+                    <form method="post" action="/admin_mode" style="display:inline-flex;">
+                        <input type="hidden" name="room" value="{{ selected_room }}">
+                        <input type="hidden" name="enabled" value="{% if admin_mode %}0{% else %}1{% endif %}">
+                        <button class="btn btn-ghost" type="submit">{% if admin_mode %}Выключить Admin Mode{% else %}Включить Admin Mode{% endif %}</button>
+                    </form>
+                </div>
+            </header>
+
+            {% if admin_mode %}
+            <div class="admin-note">Admin Mode включён: доступны кнопки удаления компьютера с места и удалённая команда на удаление `client_config.json` на клиенте.</div>
+            {% endif %}
+
+            {% if admin_result == "partial" %}
+            <div class="admin-note">Место очищено в сервере, но команда удаления конфига не доставлена клиенту.</div>
+            {% elif admin_result == "ok" %}
+            <div class="admin-note" style="border-color:#86efac;background:#ecfdf5;color:#065f46;">Место очищено, команда удаления конфига отправлена клиенту.</div>
+            {% endif %}
+
+            <div class="progress-wrap">
+                <div class="progress">
+                    <div id="bar" class="progress-bar">0%</div>
+                </div>
+                <div id="progress-label" class="pc-meta" style="margin-top:8px;">Готово</div>
+            </div>
+
+            <div class="room-bar">
+                <form class="room-form" method="get" action="/">
+                    <label for="room">Аудитория</label>
+                    <select id="room" name="room" class="field">
+                        {% for room in rooms %}
+                        <option value="{{ room }}" {% if room == selected_room %}selected{% endif %}>{{ room }}</option>
+                        {% endfor %}
+                    </select>
+                    <button class="btn btn-ghost" type="submit">Показать</button>
+                </form>
+            </div>
+
+            <div class="layout">
+                {% for row in classroom %}
+                <section>
+                    <h3 class="row-title">Ряд {{ row.row_no }}</h3>
+                    <div class="desks">
+                        {% for desk in row.desks %}
+                        <article class="desk">
+                            <div class="desk-name">Парта {{ desk.desk_no }}</div>
+                            {% for place in desk.pcs %}
+                                {% set d = place.device %}
+                                {% if d %}
+                                    {% if d.combined_status == 'heartbeat' %}
+                                        {% set state = 'state-up' %}
+                                        {% set badge = 'badge-up' %}
+                                        {% set status_label = 'Онлайн' %}
+                                    {% elif d.combined_status == 'ping' %}
+                                        {% set state = 'state-up' %}
+                                        {% set badge = 'badge-up' %}
+                                        {% set status_label = 'Онлайн (пинг)' %}
+                                    {% elif d.combined_status == 'offline' %}
+                                        {% set state = 'state-down' %}
+                                        {% set badge = 'badge-down' %}
+                                        {% set status_label = 'Офлайн' %}
+                                    {% else %}
+                                        {% set state = 'state-unknown' %}
+                                        {% set badge = 'badge-unknown' %}
+                                        {% set status_label = 'Нет данных' %}
+                                    {% endif %}
+                                {% else %}
+                                    {% set state = 'state-empty' %}
+                                    {% set badge = 'badge-unknown' %}
+                                    {% set status_label = 'Пусто' %}
+                                {% endif %}
+
+                                <div class="pc-slot {{ state }}" data-device-id="{{ d.id if d else '' }}" data-pc="{{ place.pc_no }}" data-row="{{ place.row_no }}" data-desk="{{ place.desk_no }}">
+                                    <div class="pc-head">
+                                        <strong>ПК {{ place.pc_no }} {% if place.pc_no == 1 %}(слева){% else %}(справа){% endif %}</strong>
+                                        <span class="badge {{ badge }}">{{ status_label }}</span>
+                                    </div>
+                                    {% if d %}
+                                        <div class="pc-name">{{ d.name }}</div>
+                                        <div class="pc-meta mono">{{ d.ip }}</div>
+                                        <div class="pc-meta">RT: {{ "%.1f"|format(d.response_time) if d.response_time is not none else "-" }} ms</div>
+                                        {% if admin_mode %}
+                                        <div class="pc-actions">
+                                            <button class="dots-btn" onclick="toggleMenu(this)" title="Действия">⋯</button>
+                                            <div class="dots-menu">
+                                                <button onclick="alert('В разработке')">🖥 Управление компьютером</button>
+                                                <form method="post" action="/admin/remove_assignment/{{ d.id }}" style="margin:0">
+                                                    <input type="hidden" name="room" value="{{ selected_room }}">
+                                                    <button type="submit" class="menu-danger">✕ Удалить с места</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    {% else %}
+                                        <div class="pc-meta">Нет назначенного компьютера</div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </article>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="panel">
+            <header class="header">
+                <div>
+                    <h2 class="title" style="font-size:1.2rem;">Все устройства</h2>
+                    <p class="subtitle">Здесь можно вручную назначать места в аудитории</p>
+                </div>
+            </header>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>IP</th>
+                            <th>Status</th>
+                            <th>RT</th>
+                            <th>Heartbeat</th>
+                            <th>Место</th>
+                            <th>Назначить</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in devices %}
+                        <tr>
+                            <td>{{ d.id }}</td>
+                            <td>{{ d.name }}</td>
+                            <td class="mono">{{ d.ip }}</td>
+                            <td>
+                                {% if d.combined_status == 'heartbeat' %}
+                                <span class="status-pill badge-up" data-device-id="{{ d.id }}">Онлайн</span>
+                                {% elif d.combined_status == 'ping' %}
+                                <span class="status-pill badge-up" data-device-id="{{ d.id }}">Онлайн (пинг)</span>
+                                {% elif d.combined_status == 'offline' %}
+                                <span class="status-pill badge-down" data-device-id="{{ d.id }}">Офлайн</span>
+                                {% else %}
+                                <span class="status-pill badge-unknown" data-device-id="{{ d.id }}">Нет данных</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ "%.1f"|format(d.response_time) if d.response_time is not none else "-" }}</td>
+                            <td>{{ d.last_heartbeat or "-" }}</td>
+                            <td>
+                                {% if d.room and d.row_no and d.desk_no and d.pc_no %}
+                                    Ауд. {{ d.room }}, ряд {{ d.row_no }}, парта {{ d.desk_no }}, ПК {{ d.pc_no }}
+                                {% else %}
+                                    Не назначено
+                                {% endif %}
+                            </td>
+                            <td>
+                                <form class="assign-form" method="post" action="/assign/{{ d.id }}">
+                                    <input class="mini" type="text" name="room" value="{{ d.room or selected_room }}" placeholder="Ауд" required>
+                                    <select class="mini" name="row_no">
+                                        <option value="">Ряд</option>
+                                        {% for i in [1, 2] %}
+                                        <option value="{{ i }}" {% if d.row_no == i %}selected{% endif %}>{{ i }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <select class="mini" name="desk_no">
+                                        <option value="">Парта</option>
+                                        {% for i in [1, 2, 3, 4] %}
+                                        <option value="{{ i }}" {% if d.desk_no == i %}selected{% endif %}>{{ i }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <select class="mini" name="pc_no">
+                                        <option value="">ПК</option>
+                                        {% for i in [1, 2] %}
+                                        <option value="{{ i }}" {% if d.pc_no == i %}selected{% endif %}>{{ i }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <button class="btn btn-ghost" type="submit">Сохранить</button>
+                                </form>
+                            </td>
+                            <td class="actions">
+                                <a href="/export/{{ d.id }}">Export</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script>
+    function toggleMenu(btn) {
+        const menu = btn.nextElementSibling;
+        const isOpen = menu.classList.contains('open');
+        // close all open menus first
+        document.querySelectorAll('.dots-menu.open').forEach(m => m.classList.remove('open'));
+        if (!isOpen) menu.classList.add('open');
+    }
+
+    document.addEventListener('click', e => {
+        if (!e.target.closest('.pc-actions')) {
+            document.querySelectorAll('.dots-menu.open').forEach(m => m.classList.remove('open'));
+        }
+    });
+
+    // --- Status labels/classes map ---
+    const STATUS = {
+        heartbeat: { state: 'state-up',      badge: 'badge-up',      label: 'Онлайн' },
+        ping:      { state: 'state-up',      badge: 'badge-up',      label: 'Онлайн (пинг)' },
+        offline:   { state: 'state-down',    badge: 'badge-down',    label: 'Офлайн' },
+        unknown:   { state: 'state-unknown', badge: 'badge-unknown', label: 'Нет данных' },
+    };
+    const STATE_CLASSES = ['state-up', 'state-down', 'state-unknown', 'state-empty'];
+
+    function applyStatuses(data) {
+        // Update classroom grid slots
+        document.querySelectorAll('.pc-slot[data-device-id]').forEach(slot => {
+            const id = slot.dataset.deviceId;
+            if (!id) return;
+            const s = data[id] || 'unknown';
+            const cfg = STATUS[s] || STATUS.unknown;
+
+            // swap state class
+            STATE_CLASSES.forEach(c => slot.classList.remove(c));
+            slot.classList.add(cfg.state);
+
+            // swap badge text + class
+            const badge = slot.querySelector('.badge');
+            if (badge) {
+                badge.className = 'badge ' + cfg.badge;
+                badge.textContent = cfg.label;
+            }
+        });
+
+        // Update devices table pills
+        document.querySelectorAll('.status-pill[data-device-id]').forEach(pill => {
+            const id = pill.dataset.deviceId;
+            const s = data[id] || 'unknown';
+            const cfg = STATUS[s] || STATUS.unknown;
+            pill.className = 'status-pill ' + cfg.badge;
+            pill.textContent = cfg.label;
+        });
+    }
+
+    function pollStatuses() {
+        fetch('/api/device_statuses')
+            .then(r => r.json())
+            .then(applyStatuses)
+            .catch(() => {})   // silent fail — stale data is fine
+            .finally(() => setTimeout(pollStatuses, 30000));
+    }
+
+    // Kick off after page load
+    document.addEventListener('DOMContentLoaded', () => setTimeout(pollStatuses, 30000));
+    </script>
+</body>
+</html>
