@@ -602,6 +602,62 @@
     </main>
 
     <script>
+    // --- Ping refresh ---
+    const pingBtn = document.querySelector('button[onclick="startPingRefresh()"]');
+
+    function setPingProgress(progress, total, labelText) {
+        const safeTotal = total || 1;
+        const p = Math.floor((progress / safeTotal) * 100);
+        const bar = document.getElementById('bar');
+        const label = document.getElementById('progress-label');
+        bar.style.width = p + '%';
+        bar.textContent = p + '%';
+        label.textContent = labelText + ' (' + progress + '/' + safeTotal + ')';
+    }
+
+    function setPingDone() {
+        const bar = document.getElementById('bar');
+        const label = document.getElementById('progress-label');
+        bar.style.width = '100%';
+        bar.textContent = '100%';
+        label.textContent = 'Готово';
+        if (pingBtn) { pingBtn.disabled = false; pingBtn.textContent = 'Обновить пинг'; }
+        // Immediately pull fresh statuses so cards update right away
+        fetch('/api/device_statuses').then(r => r.json()).then(applyStatuses).catch(() => {});
+        setTimeout(() => {
+            bar.style.width = '0%';
+            bar.textContent = '0%';
+            label.textContent = 'Готово';
+        }, 2000);
+    }
+
+    function pollPingStatus() {
+        fetch('/ping_status')
+            .then(r => r.json())
+            .then(d => {
+                setPingProgress(d.progress || 0, d.total || 1, 'Обновление пинга');
+                if (d.running) {
+                    setTimeout(pollPingStatus, 600);
+                } else {
+                    setPingDone();
+                }
+            })
+            .catch(() => { if (pingBtn) { pingBtn.disabled = false; pingBtn.textContent = 'Обновить пинг'; } });
+    }
+
+    function startPingRefresh() {
+        if (pingBtn) { pingBtn.disabled = true; pingBtn.textContent = 'Обновление…'; }
+        fetch('/refresh_ping')
+            .then(r => {
+                if (!r.ok) return r.json().then(d => Promise.reject(d.error || 'Ошибка'));
+                pollPingStatus();
+            })
+            .catch(e => {
+                alert(e);
+                if (pingBtn) { pingBtn.disabled = false; pingBtn.textContent = 'Обновить пинг'; }
+            });
+    }
+
     function toggleMenu(btn) {
         const menu = btn.nextElementSibling;
         const isOpen = menu.classList.contains('open');
